@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+# Сервис для разворачивания контейнера с базой данных
+  database:
+    image: postgres:15
+    volumes:
+      - /var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=animal-chipization
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+# Сервис для разворачивания контейнера с приложением
+  webapi:
+    image: animal_chipization_api:v1
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - FLASK_DEBUG=TRUE
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=8080
+      - POSTGRES_HOST=database
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=animal-chipization
+      - POSTGRES_TEST_DB=animal-chipization-test
+
+# Сервис для разворачивания контейнера с автотестами
+  tests:
+    image: mrexpen/planet_olymp_phase1
+    pull_policy: always
+    ports:
+      - "8090:8080"
+    depends_on:
+      - webapi
+    environment:
+      SERVER_URL: http://webapi:8080
+      STAGE: all
+      # all - запуск всех тестов из трёх доступных этапов
+      # 0, 1 или 2 - запуск тестов для соответствующего этапа
