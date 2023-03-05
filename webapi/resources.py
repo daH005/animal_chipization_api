@@ -360,10 +360,26 @@ class Animals(Resource):
             abort(HTTPStatus.NOT_FOUND)
         else:
             new_animal_data_dict = new_animal_data.dict()
-            new_animal_data_dict['life_status'] = 'ALIVE'
             new_animal_data_dict['chipping_datetime'] = datetime.now()
 
             new_animal = Animal(**new_animal_data_dict)
             db.session.add(new_animal)
             db.session.commit()
             return new_animal, HTTPStatus.CREATED
+
+
+@resource_route(api, '/animals/<string:_id>')
+class AnimalsID(Resource):
+
+    @marshal_with(animal_resource_fields)
+    def get(self, _id: str) -> tuple[Animal, HTTPStatus] | None:
+        # Если авторизационные данные (email + пароль) невалидны, то вызовем `abort` со статус-кодом = 401.
+        abort_with_unauthorized_if_authorization_data_is_invalid()
+        # Если входящий ID искомого животного невалиден, то вызовем `abort` со статус-кодом = 400.
+        abort_with_bad_request_if_id_is_invalid(_id)
+
+        found_animal = Animal.query.filter_by(id=_id).first()
+        if found_animal:
+            return found_animal, HTTPStatus.OK
+        else:
+            abort(HTTPStatus.NOT_FOUND)

@@ -1,5 +1,6 @@
 import unittest
 from base64 import b64encode
+from datetime import datetime
 
 from webapi import app, configure_app_and_db
 from webapi.config import TestConfig
@@ -67,6 +68,15 @@ class BaseTestMethod(unittest.TestCase):
 
         for payload in payloads:
             db.session.add(AnimalType(**payload))
+            db.session.commit()
+
+    @staticmethod
+    def _create_test_animals(payloads: list[dict] | None = None) -> None:
+        if not payloads:
+            payloads = ANIMALS_FOR_ORM
+
+        for payload in payloads:
+            db.session.add(Animal(**payload, chipping_datetime=datetime.now()))
             db.session.commit()
 
     def _test_requests(self, requests_data: list[dict],

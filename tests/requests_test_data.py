@@ -142,4 +142,85 @@ VALID_ANIMALS_TYPES_PAYLOADS: Final = [
     {'type': 'fish'},
     {'type': 'air'},
     {'type': 'amphibians'},
+    {'type': 'cat'},
+    {'type': 'dog'},
+]
+
+VALID_ANIMALS_PAYLOADS: Final = [
+    {'animalTypes': [1, 2, 3],
+     'weight': 1.5,
+     'length': 2.5,
+     'height': 3.5,
+     'gender': 'MALE',
+     'chipperId': 1,
+     'chippingLocationId': 1},
+    {'animalTypes': [6],
+     'weight': 1,
+     'length': 2,
+     'height': 3,
+     'gender': 'FEMALE',
+     'chipperId': 2,
+     'chippingLocationId': 3},
+    {'animalTypes': [2, 4],
+     'weight': 4.7,
+     'length': 1.1,
+     'height': 1.2,
+     'gender': 'MALE',
+     'chipperId': 2,
+     'chippingLocationId': 2},
+    {'animalTypes': [5, 6],
+     'weight': 6.7,
+     'length': 1.9,
+     'height': 2.3,
+     'gender': 'FEMALE',
+     'chipperId': 4,
+     'chippingLocationId': 5},
+    {'animalTypes': [2, 5],
+     'weight': 14.2,
+     'length': 12.5,
+     'height': 7.7,
+     'gender': 'OTHER',
+     'chipperId': 3,
+     'chippingLocationId': 7},
+]
+ANIMALS_FOR_ORM: Final = decamelize(VALID_ANIMALS_PAYLOADS)
+
+INVALID_ANIMALS_TYPES: Final = [
+    [0],
+    [None],
+    [],
+    None,
+    [-1],
+    [-1, 0, None],
+]
+
+INVALID_NUMBERS: Final = [
+    None,
+    0,
+    -1,
+    -2,
+    -10,
+    -1000,
+]
+
+INVALID_GENDERS: Final = [
+    'MAL',
+    'FEMAL',
+    '_FEMALE_',
+    'OTHERR',
+    'MALEE',
+]
+
+INVALID_ANIMALS_TYPES_WITH_DUPLICATES: Final = [
+    [1, 1, 1],
+    [1, 2, 1],
+    [1, 2, 3, 1],
+    [2, 2, ],
+    [3, 2, 1, 4, 4],
+]
+
+NON_EXISTENT_ANIMALS_TYPES: Final = [
+    [10, 20, 30],
+    [1000, 10, 2],
+    [1, 2, 50],
 ]

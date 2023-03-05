@@ -44,7 +44,7 @@ class Animal(db.Model):
     length = db.Column(db.Float, nullable=False)
     height = db.Column(db.Float, nullable=False)
     gender = db.Column(db.String, nullable=False)
-    life_status = db.Column(db.String, nullable=False)
+    life_status = db.Column(db.String, nullable=False, default='ALIVE')
     chipping_datetime = db.Column(db.DateTime, nullable=False)
     chipper_id = db.Column(db.Integer, nullable=False)
     chipping_location_id = db.Column(db.Integer, nullable=False)
