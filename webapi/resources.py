@@ -133,33 +133,20 @@ class AccountsSearch(Resource):
         # Если авторизационные данные (email + пароль) невалидны, то вызовем `abort` со статус-кодом = 401.
         abort_with_unauthorized_if_authorization_data_is_invalid()
 
-        # Копируем GET-параметры (оборачиваем в `dict(...)`), чтобы работать с независимым объектом `dict`.
-        get_params = dict(request.args)
         try:
-            # Два параметра, отвечающие за срез результатов поиска.
-            # Сохраняем их в переменные и удаляем из `get_params` для того,
-            # что бы в нём остались только параметры, подлежащие валидации в `AccountSearch`.
-            from_ = int(get_params.pop('from', 0))
-            size = int(get_params.pop('size', 10))
-        # `ValueError` может возникнуть в случае, если "from" или "size" не являются строковыми
-        # представлениями чисел.
-        # В таком случае вызовем `abort` со статус-кодом = 400.
-        except ValueError:
+            # Формируем словарь поисковых параметров.
+            # Если какой-то ожидаемый GET-параметр отсутствует, то он не добавляется в словарь поисковых параметров.
+            # `AccountSearch` не обрабатывает левые GET-параметры, поэтому "SQL-инъекции" исключены.
+            # `exclude_unset` = True - исключает параметры = None для того, чтобы они не участвовали в фильтрации.
+            search_params = AccountSearch(**request.args)
+        except ValidationError:
             return abort(HTTPStatus.BAD_REQUEST)
 
-        # Если параметры среза некорректны, то
-        # вызовем `abort` со статус-кодом = 400.
-        if from_ < 0 or size <= 0:
-            return abort(HTTPStatus.BAD_REQUEST)
-
-        # Формируем словарь поисковых параметров.
-        # Если какой-то ожидаемый GET-параметр отсутствует, то он не добавляется в словарь поисковых параметров.
-        # `AccountSearch` не обрабатывает левые GET-параметры, поэтому "SQL-инъекции" исключены.
-        # `exclude_unset` = True - исключает параметры = None для того, чтобы они не участвовали в фильтрации.
-        search_params = AccountSearch(**get_params).dict(exclude_unset=True)
         # Заранее подготавливаем параметры фильтрации.
         filter_args = []
-        for param_name, value in search_params.items():
+        for param_name, value in search_params.dict(exclude={'from_', 'size'},
+                                                    exclude_none=True,
+                                                    ).items():
             # Фильтрация каждого параметра происходит без учёта регистра
             # и с учётом только части значения.
             filter_arg = getattr(Account, param_name).icontains(value)
@@ -168,13 +155,11 @@ class AccountsSearch(Resource):
         # Производим фильтрацию по подготовленным параметрам `filter_args`;
         # Упорядочиваем список результатов в порядке возрастания "id";
         # Берём нужный кусок результатов из общего списка (производим пагинацию).
-        search_results: Iterable[Account] = Account.query.filter(*filter_args).order_by('id').paginate(page=from_,
-                                                                                                       per_page=size,
-                                                                                                       error_out=False)
+        search_results: Iterable[Account] = Account.query.filter(*filter_args).order_by('id')
         # Преобразуем `search_results` в `list` для корректной обработки в `@marshal_with(...)`,
         # после чего возвращаем этот список + статус-код = 200.
         # `@marshal_with(...)` преобразует список объектов `Account` в JSON.
-        return list(search_results), HTTPStatus.OK
+        return list(search_results[search_params.from_:search_params.from_ + search_params.size]), HTTPStatus.OK
 
 
 @resource_route(api, '/locations')
@@ -350,7 +335,7 @@ class Animals(Resource):
         if len(new_animal_data.animal_types) != len(set(new_animal_data.animal_types)):
             abort(HTTPStatus.CONFLICT)
 
-        for type_id in new_animal_data.animal_types:
+        for type_id in new_animal_data.animal_types:  # FixMe
             if not AnimalType.query.filter_by(id=type_id).first():
                 abort(HTTPStatus.NOT_FOUND)
 
@@ -383,3 +368,45 @@ class AnimalsID(Resource):
             return found_animal, HTTPStatus.OK
         else:
             abort(HTTPStatus.NOT_FOUND)
+
+
+@resource_route(api, '/animals/search')
+class AnimalsSearch(Resource):
+
+    @marshal_with(animal_resource_fields)
+    def get(self) -> tuple[list[Animal], HTTPStatus] | None:
+        # Если авторизационные данные (email + пароль) невалидны, то вызовем `abort` со статус-кодом = 401.
+        abort_with_unauthorized_if_authorization_data_is_invalid()
+
+        try:
+            # Формируем словарь поисковых параметров.
+            # Если какой-то ожидаемый GET-параметр отсутствует, то он не добавляется в словарь поисковых параметров.
+            # `AccountSearch` не обрабатывает левые GET-параметры, поэтому "SQL-инъекции" исключены.
+            # `exclude_unset` = True - исключает параметры = None для того, чтобы они не участвовали в фильтрации.
+            search_params = AnimalSearch(**request.args)
+        except ValidationError:
+            return abort(HTTPStatus.BAD_REQUEST)
+
+        # Заранее подготавливаем параметры фильтрации.
+        filter_args = []
+        if search_params.start_datetime:
+            filter_args.append(Animal.chipping_datetime >= search_params.start_datetime)
+        if search_params.end_datetime:
+            filter_args.append(Animal.chipping_datetime <= search_params.end_datetime)
+        for param_name, value in search_params.dict(exclude={'from_', 'size',
+                                                             'start_datetime', 'end_datetime'},
+                                                    exclude_none=True,
+                                                    ).items():
+            # Фильтрация каждого параметра происходит без учёта регистра
+            # и с учётом только части значения.
+            filter_arg = getattr(Animal, param_name) == value
+            filter_args.append(filter_arg)
+
+        # Производим фильтрацию по подготовленным параметрам `filter_args`;
+        # Упорядочиваем список результатов в порядке возрастания "id";
+        # Берём нужный кусок результатов из общего списка (производим пагинацию).
+        search_results: Iterable[Animal] = Animal.query.filter(*filter_args).order_by('id')
+        # Преобразуем `search_results` в `list` для корректной обработки в `@marshal_with(...)`,
+        # после чего возвращаем этот список + статус-код = 200.
+        # `@marshal_with(...)` преобразует список объектов `Account` в JSON.
+        return list(search_results[search_params.from_:search_params.from_ + search_params.size]), HTTPStatus.OK

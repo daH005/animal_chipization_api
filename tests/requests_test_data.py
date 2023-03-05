@@ -56,7 +56,7 @@ INVALID_EMAILS: Final = [
     'invalid_email@com',
 ]
 
-ANY_SEARCH_PARAMS_SETS: Final = [
+ANY_ACCOUNTS_SEARCH_PARAMS_SETS: Final = [
     {'firstName': 'al'},
     {'lastName': 'dan'},
     {'email': 'test.testov', 'size': 15},
@@ -194,13 +194,17 @@ INVALID_ANIMALS_TYPES: Final = [
     [-1, 0, None],
 ]
 
-INVALID_NUMBERS: Final = [
-    None,
+INVALID_NUMBERS_WITHOUT_NONE: Final = [
     0,
     -1,
     -2,
     -10,
     -1000,
+]
+
+INVALID_NUMBERS: Final = [
+    *INVALID_NUMBERS_WITHOUT_NONE,
+    None,
 ]
 
 INVALID_GENDERS: Final = [
@@ -223,4 +227,39 @@ NON_EXISTENT_ANIMALS_TYPES: Final = [
     [10, 20, 30],
     [1000, 10, 2],
     [1, 2, 50],
+]
+
+ANY_ANIMALS_SEARCH_PARAMS_SETS: Final = [
+    {'XXX': None, 'YYY': 123},
+    {'gender': 'MALE'},
+    {'gender': 'FEMALE'},
+    {'gender': 'OTHER'},
+    {'chipperId': 1},
+    {'chipperId': 2},
+    {'chippingLocationId': 1},
+    {'chipperId': 3, 'chippingLocationId': 7},
+    {'lifeStatus': 'ALIVE'},
+    {'from': 1},
+    {'size': 15, 'from': 2},
+    {'from': 0, 'size': 200},
+    {'startDateTime': '2020-01-01T22:00:00'},
+    {'endDateTime': '5020-01-01T22:00:00'},
+]
+
+INVALID_DATETIMES: Final = [
+    '10.12.2004',
+    '2004--12--55',
+    # 1,  ToDo: Узнать допускают ли такие значения тесты от симбир
+    # '1',
+    # 2,
+]
+
+INVALID_LIFE_STATUTES: Final = [
+    'LIVE',
+    'LIFE',
+    'ALIFE',
+    'DEATH',
+    'DEADED',
+    'DED',
+    'LIV',
 ]

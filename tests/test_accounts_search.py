@@ -8,11 +8,11 @@ class TestGET(BaseTestMethod):
     urn = 'accounts/search'
     method = 'get'
 
-    def test_200_and_results_if_all_right(self) -> None:
+    def test_200_and_accounts_if_all_right(self) -> None:
         self._create_test_accounts()
 
         requests_data = []
-        for params in ANY_SEARCH_PARAMS_SETS:
+        for params in ANY_ACCOUNTS_SEARCH_PARAMS_SETS:
             requests_data.append({'query_string': params})
         self._test_requests(requests_data, 200, assert_not_empty_json=True)
 
