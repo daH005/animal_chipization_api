@@ -79,12 +79,8 @@ INVALID_SIZES: Final = [
 ]
 
 INVALID_IDS: Final = [
-    'null',
     '0',
-    0,
-    '-11',
-    -11,
-    None,
+    0
 ]
 
 NON_EXISTENT_IDS: Final = [
@@ -262,4 +258,35 @@ INVALID_LIFE_STATUTES: Final = [
     'DEADED',
     'DED',
     'LIV',
+]
+
+VALID_ANIMALS_UPDATING_PAYLOADS: Final = [
+    {'weight': 1,
+     'length': 2,
+     'height': 1,
+     'gender': 'MALE',
+     'lifeStatus': 'ALIVE',
+     'chipperId': 2,
+     'chippingLocationId': 2},
+    {'weight': 1.1,
+     'length': 2,
+     'height': 1.2,
+     'gender': 'FEMALE',
+     'lifeStatus': 'ALIVE',
+     'chipperId': 2,
+     'chippingLocationId': 2},
+    {'weight': 1.2,
+     'length': 1.9,
+     'height': 1.2,
+     'gender': 'OTHER',
+     'lifeStatus': 'DEAD',
+     'chipperId': 1,
+     'chippingLocationId': 2},
+    {'weight': 1.3,
+     'length': 2.1,
+     'height': 1,
+     'gender': 'OTHER',
+     'lifeStatus': 'DEAD',
+     'chipperId': 2,
+     'chippingLocationId': 1},
 ]

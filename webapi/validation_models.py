@@ -7,6 +7,7 @@ __all__ = ('AccountRegistrationOrUpdating',
            'LocationCreatingOrUpdating',
            'AnimalTypeCreatingOrUpdating',
            'AnimalCreating',
+           'AnimalUpdating',
            'AnimalSearch',
            )
 
@@ -47,6 +48,30 @@ class AnimalCreating(BaseModel):
     gender: str
     chipper_id: conint(gt=0) = Field(alias='chipperId')
     chipping_location_id: conint(gt=0) = Field(alias='chippingLocationId')
+
+    @validator('gender')
+    def gender_value_must_be_male_or_female_or_other(cls, value: str) -> str:
+        if value in ['MALE', 'FEMALE', 'OTHER']:
+            return value
+        else:
+            raise ValueError()
+
+
+class AnimalUpdating(BaseModel):
+    weight: confloat(gt=0)
+    length: confloat(gt=0)
+    height: confloat(gt=0)
+    gender: str
+    life_status: str | None = Field(alias='lifeStatus')
+    chipper_id: conint(gt=0) = Field(alias='chipperId')
+    chipping_location_id: conint(gt=0) = Field(alias='chippingLocationId')
+
+    @validator('life_status')
+    def life_status_must_be_alive_or_dead(cls, value: str) -> str:
+        if value in ['ALIVE', 'DEAD']:
+            return value
+        else:
+            raise ValueError()
 
     @validator('gender')
     def gender_value_must_be_male_or_female_or_other(cls, value: str) -> str:

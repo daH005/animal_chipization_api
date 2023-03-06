@@ -10,10 +10,7 @@ __all__ = (
     'TestConfig',
 )
 
-_BASEDIR: Final = os.path.abspath(os.path.dirname(__file__))
-
-# Настройки приложения в состоянии производства.
-ProductionConfig = dict(
+ProductionConfig: Final = dict(
     SQLALCHEMY_DATABASE_URI=f'postgresql://'
                             f'{os.environ["POSTGRES_USER"]}:'
                             f'{os.environ["POSTGRES_PASSWORD"]}@'
@@ -22,8 +19,7 @@ ProductionConfig = dict(
                             f'{os.environ["POSTGRES_DB"]}',
 )
 
-# Настройки приложения в тестовом состоянии.
-TestConfig = dict(
+TestConfig: Final = dict(
     SQLALCHEMY_DATABASE_URI=f'postgresql://'
                             f'{os.environ["POSTGRES_USER"]}:'
                             f'{os.environ["POSTGRES_PASSWORD"]}@'
