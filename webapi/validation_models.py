@@ -11,6 +11,7 @@ __all__ = ('AccountRegistrationOrUpdating',
            'AnimalsSearch',
            'AnimalTypeUpdatingForAnimal',
            'VisitedLocationsSearch',
+           'VisitedLocationUpdating',
            )
 
 
@@ -118,3 +119,8 @@ class VisitedLocationsSearch(BaseModel):
     size: conint(gt=0) = Field(default=10)
     start_datetime: datetime | None = Field(alias='startDateTime')
     end_datetime: datetime | None = Field(alias='endDateTime')
+
+
+class VisitedLocationUpdating(BaseModel):
+    visited_location_id: conint(gt=0) = Field(alias='visitedLocationPointId')
+    location_id: conint(gt=0) = Field(alias='locationPointId')

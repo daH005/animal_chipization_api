@@ -23,7 +23,7 @@ __all__ = (
     'ids_validation',
     'request_json_validation',
     'request_args_validation',
-    'order_by_id_and_cut_results',
+    'cut_results',
 )
 
 # Словари-аргументы для `@marshal_with(...)`.
@@ -171,11 +171,11 @@ def request_args_validation(model: type[pydantic.BaseModel]) -> Callable:
     return decorator
 
 
-def order_by_id_and_cut_results(method: Callable) -> Callable:
+def cut_results(method: Callable) -> Callable:
     @wraps(method)
     def wrapper(*args, **kwargs):
         results, from_, size = method(*args, **kwargs)
-        return list(results.order_by('id'))[from_:from_ + size], HTTPStatus.OK
+        return list(results)[from_:from_ + size], HTTPStatus.OK
     return wrapper
 
 

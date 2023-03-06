@@ -2,6 +2,7 @@ from flask_restful import Api, Resource, abort, marshal_with
 from http import HTTPStatus
 from typing import Iterable
 from datetime import datetime
+from sqlalchemy import or_ as sql_or
 
 from webapi.db_models import *
 from webapi.validation_models import *
@@ -85,10 +86,12 @@ class AccountsID(Resource):
         """Удаляет аккаунт с указанным ID."""
         found_account: Account = Account.query.filter_by(id=_id).first()
 
-        # ToDo: Добавить проверку: "Аккаунт связан с животным".
-
         # Проверка: удалять можно только свой аккаунт.
         if found_account and found_account == authorized_account:
+            # Проверка: нельзя удалять аккаунт, который связан с животным.
+            if Animal.query.filter_by(chipper_id=found_account.id).first():
+                abort(HTTPStatus.BAD_REQUEST)
+
             # Удаляем аккаунт из БД.
             db.session.delete(found_account)
             db.session.commit()
@@ -101,7 +104,7 @@ class AccountsID(Resource):
 class AccountsSearch(Resource):
 
     @marshal_with(account_resource_fields)  # Преобразование возвращаемого списка объектов `Account` в JSON.
-    @order_by_id_and_cut_results  # Упорядочивание результатов поиска по ID + срез.
+    @cut_results  # Срез результатов поиска.
     @authorization_data_must_be_valid_or_none  # Проверка авторизационных данных: либо их нет, либо они корректны.
     @request_args_validation(AccountsSearch)  # Валидация входящих GET-параметров.
     def get(self,
@@ -118,7 +121,7 @@ class AccountsSearch(Resource):
             filter_arg = getattr(Account, param_name).icontains(value)
             filter_args.append(filter_arg)
 
-        return (Account.query.filter(*filter_args),
+        return (Account.query.filter(*filter_args).order_by('id'),
                 valid_args_data.from_, valid_args_data.size)
 
 
@@ -186,9 +189,11 @@ class LocationsID(Resource):
         """Удаляет точку локации с указанным ID."""
         found_location = Location.query.filter_by(id=_id).first()
 
-        # ToDo: Добавить проверку: точка связана с животным.
-
         if found_location:
+            # Проверка: нельзя удалять точку локации, связанную с животным.
+            if VisitedLocation.query.filter_by(location_id=found_location.id).first():
+                abort(HTTPStatus.BAD_REQUEST)
+
             # Удаляем точку локации из БД.
             db.session.delete(found_location)
             db.session.commit()
@@ -258,10 +263,13 @@ class AnimalsTypesID(Resource):
     @id_validation  # Валидация входящего ID типа животного.
     def delete(self, _id: int) -> tuple[dict, HTTPStatus] | None:
         """Удаляет тип животного с указанным ID."""
-        # ToDo: Добавить проверку: Есть животные с типом с typeId.
 
         found_animal_type = AnimalType.query.filter_by(id=_id).first()
         if found_animal_type:
+            # Проверка: нельзя удалять тип, если он есть у хотя бы одного животного.
+            if Animal.query.filter(Animal.animal_types.contains(_id)).first():
+                abort(HTTPStatus.BAD_REQUEST)
+
             # Удаляем тип животного из БД.
             db.session.delete(found_animal_type)
             db.session.commit()
@@ -335,9 +343,13 @@ class AnimalsID(Resource):
         elif not Location.query.filter_by(id=valid_json_data.chipping_location_id).first():
             abort(HTTPStatus.NOT_FOUND)
 
-        # ToDo: Добавить проверку: Новая точка чипирования совпадает с первой посещенной точкой локации.
-
         found_animal: Animal = Animal.query.filter_by(id=_id).first()
+
+        # Проверка: новая точка чипирования не должна совпадать с первой посещённой.
+        if len(found_animal.visited_locations) > 0:
+            if valid_json_data.chipping_location_id == VisitedLocation.query.filter_by(id=found_animal.visited_locations[0]).first().location_id:
+                abort(HTTPStatus.BAD_REQUEST)
+
         if found_animal:
             new_animal_data_dict = valid_json_data.dict()
             # Проверка: нельзя сменять статус "DEAD" на "ALIVE".
@@ -359,11 +371,16 @@ class AnimalsID(Resource):
     @id_validation  # Валидация входящего ID животного.
     def delete(self, _id: int) -> tuple[dict, HTTPStatus] | None:
         """Удаляет животное с указанным ID."""
-        # ToDo: Добавить проверку: Животное покинуло локацию чипирования, при этом
-        #  есть другие посещенные точки
 
         found_animal = Animal.query.filter_by(id=_id).first()
+
         if found_animal:
+            # Проверка: животное покинуло локацию чипирования + есть более одной точки.
+            if len(found_animal.visited_locations) > 1:
+                if VisitedLocation.query.filter_by(
+                        id=found_animal.visited_locations[-1]).first().location_id != found_animal.chipping_location_id:
+                    abort(HTTPStatus.BAD_REQUEST)
+
             # Удаляем животное из БД.
             db.session.delete(found_animal)
             db.session.commit()
@@ -376,7 +393,7 @@ class AnimalsID(Resource):
 class AnimalsSearch(Resource):
 
     @marshal_with(animal_resource_fields)  # Преобразование возвращаемого списка объектов `Animal` в JSON.
-    @order_by_id_and_cut_results  # Упорядочивание результатов по ID + срез.
+    @cut_results  # Срез результатов поиска.
     @authorization_data_must_be_valid_or_none  # Проверка авторизационных данных: либо их нет, либо они корректны.
     @request_args_validation(AnimalsSearch)  # Валидация входящих GET-параметров.
     def get(self, valid_args_data: AnimalsSearch,
@@ -399,7 +416,7 @@ class AnimalsSearch(Resource):
             filter_arg = getattr(Animal, param_name) == value
             filter_args.append(filter_arg)
 
-        return (Animal.query.filter(*filter_args),
+        return (Animal.query.filter(*filter_args).order_by('id'),
                 valid_args_data.from_, valid_args_data.size)
 
 
@@ -518,3 +535,106 @@ class AnimalsIDLocationsID(Resource):
         found_animal.visited_locations = [*found_animal.visited_locations, new_visited_location.id]
         db.session.commit()
         return new_visited_location, HTTPStatus.CREATED
+
+    @authorization_required()
+    @ids_validation('animal_id', 'location_id')  # Валидация входящих ID животного и точки локации посещённой животным.
+    def delete(self, animal_id: int, location_id: int) -> tuple[dict, HTTPStatus] | None:
+        """"""
+        visited_location_id = location_id
+
+        found_animal: Animal = Animal.query.filter_by(id=animal_id).first()
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+
+        found_visited_location: VisitedLocation = VisitedLocation.query.filter_by(id=visited_location_id).first()
+        if not found_visited_location:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if visited_location_id not in found_animal.visited_locations:
+            abort(HTTPStatus.NOT_FOUND)
+
+        new_visited_locations = list(found_animal.visited_locations)
+        new_visited_locations.remove(visited_location_id)
+        if len(new_visited_locations) > 0:
+            if VisitedLocation.query.filter_by(id=new_visited_locations[0]).first().location_id == found_animal.chipping_location_id:
+                del new_visited_locations[0]
+        found_animal.visited_locations = new_visited_locations
+        db.session.commit()
+        db.session.delete(found_visited_location)
+        db.session.commit()
+        return dict(), HTTPStatus.OK
+
+
+@resource_route(api, '/animals/<signed_int:_id>/locations')
+class AnimalsIDLocations(Resource):
+
+    @marshal_with(visited_location_resource_fields)
+    @cut_results
+    @authorization_data_must_be_valid_or_none
+    @request_args_validation(VisitedLocationsSearch)
+    def get(self, _id: int,
+            valid_args_data: VisitedLocationsSearch,
+            ) -> tuple[list[VisitedLocation], int, int] | None:
+        found_animal: Animal = Animal.query.filter_by(id=_id).first()
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+
+        # FixMe
+        if not found_animal.visited_locations:
+            return [], valid_args_data.from_, valid_args_data.size
+
+        # FixMe
+        visited_locations_filter_args = [VisitedLocation.id == __id for __id in found_animal.visited_locations]
+        datetime_filter_args = []
+        if valid_args_data.start_datetime:
+            datetime_filter_args.append(VisitedLocation.visit_datetime >= valid_args_data.start_datetime)
+        if valid_args_data.end_datetime:
+            datetime_filter_args.append(VisitedLocation.visit_datetime <= valid_args_data.end_datetime)
+        found_visited_locations = VisitedLocation.query.filter(sql_or(*visited_locations_filter_args)).filter(*datetime_filter_args)
+
+        return (found_visited_locations.order_by('visit_datetime'),
+                valid_args_data.from_,
+                valid_args_data.size)
+
+    @marshal_with(visited_location_resource_fields)
+    @authorization_required()
+    @id_validation
+    @request_json_validation(VisitedLocationUpdating)
+    def put(self, _id: int,
+            valid_json_data: VisitedLocationUpdating,
+            ) -> tuple[VisitedLocation, HTTPStatus] | None:
+        found_animal: Animal = Animal.query.filter_by(id=_id).first()
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if valid_json_data.visited_location_id not in found_animal.visited_locations:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if not Location.query.filter_by(id=valid_json_data.location_id).first():
+            abort(HTTPStatus.NOT_FOUND)
+
+        found_visited_location: VisitedLocation = VisitedLocation.query.filter_by(id=valid_json_data.visited_location_id).first()
+        if not found_visited_location:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if (found_animal.visited_locations.index(found_visited_location.id) == 0 and
+            valid_json_data.location_id == found_animal.chipping_location_id):
+            abort(HTTPStatus.BAD_REQUEST)
+
+        if found_visited_location.location_id == valid_json_data.location_id:
+            abort(HTTPStatus.BAD_REQUEST)
+
+        if len(found_animal.visited_locations) > 1:
+            _index = found_animal.visited_locations.index(valid_json_data.visited_location_id)
+            if _index != len(found_animal.visited_locations) - 1:
+                if VisitedLocation.query.filter_by(id=found_animal.visited_locations[_index + 1]).first().location_id == valid_json_data.location_id:
+                    abort(HTTPStatus.BAD_REQUEST)
+
+            if _index != 0:
+                if VisitedLocation.query.filter_by(
+                        id=found_animal.visited_locations[_index - 1]).first().location_id == valid_json_data.location_id:
+                    abort(HTTPStatus.BAD_REQUEST)
+
+        found_visited_location.location_id = valid_json_data.location_id
+        db.session.commit()
+        return found_visited_location, HTTPStatus.OK
