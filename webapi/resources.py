@@ -103,9 +103,9 @@ class AccountsSearch(Resource):
     @marshal_with(account_resource_fields)  # Преобразование возвращаемого списка объектов `Account` в JSON.
     @order_by_id_and_cut_results  # Упорядочивание результатов поиска по ID + срез.
     @authorization_data_must_be_valid_or_none  # Проверка авторизационных данных: либо их нет, либо они корректны.
-    @request_args_validation(AccountSearch)  # Валидация входящих GET-параметров.
+    @request_args_validation(AccountsSearch)  # Валидация входящих GET-параметров.
     def get(self,
-            valid_args_data: AccountSearch,
+            valid_args_data: AccountsSearch,
             ) -> tuple[Iterable[Account], int, int]:
         """Производит поиск аккаунтов по параметрам."""
         # Формируем параметры фильтрации для ORM.
@@ -346,7 +346,7 @@ class AnimalsID(Resource):
             # Если мы сменяем "ALIVE" на "DEAD", то указываем текущие дату и время
             # как время смерти животного.
             if found_animal.life_status == 'ALIVE' and valid_json_data.life_status == 'DEAD':
-                new_animal_data_dict['deathDateTime'] = datetime.now()
+                new_animal_data_dict['death_datetime'] = datetime.now()
 
             # Обновляем животное в БД.
             set_attrs_of_model_instance(found_animal, new_animal_data_dict)
@@ -378,8 +378,8 @@ class AnimalsSearch(Resource):
     @marshal_with(animal_resource_fields)  # Преобразование возвращаемого списка объектов `Animal` в JSON.
     @order_by_id_and_cut_results  # Упорядочивание результатов по ID + срез.
     @authorization_data_must_be_valid_or_none  # Проверка авторизационных данных: либо их нет, либо они корректны.
-    @request_args_validation(AnimalSearch)  # Валидация входящих GET-параметров.
-    def get(self, valid_args_data: AnimalSearch,
+    @request_args_validation(AnimalsSearch)  # Валидация входящих GET-параметров.
+    def get(self, valid_args_data: AnimalsSearch,
             ) -> tuple[Iterable[Animal], int, int]:
         """Производит поиск животных по параметрам."""
         # Формируем параметры фильтрации для ORM.
@@ -401,3 +401,120 @@ class AnimalsSearch(Resource):
 
         return (Animal.query.filter(*filter_args),
                 valid_args_data.from_, valid_args_data.size)
+
+
+@resource_route(api, '/animals/<signed_int:animal_id>/types/<signed_int:animal_type_id>')
+class AnimalsIDTypesID(Resource):
+
+    @marshal_with(animal_resource_fields)  # Преобразование возвращаемого объекта `Animal` в JSON.
+    @authorization_required()  # Проверка авторизации (она обязательна).
+    @ids_validation('animal_id', 'animal_type_id')  # Валидация входящих ID животного и его типа.
+    def post(self, animal_id: int, animal_type_id: int) -> tuple[Animal, HTTPStatus] | None:
+        """Добавляем тип с указанным ID животному с указанным ID."""
+        found_animal: Animal = Animal.query.filter_by(id=animal_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+        # Проверка: тип животного с указанным ID должен существовать в БД.
+        if not AnimalType.query.filter_by(id=animal_type_id).first():
+            abort(HTTPStatus.NOT_FOUND)
+        # Проверка: указанного ID типа животного не должно быть в "animalTypes" животного.
+        if animal_type_id in found_animal.animal_types:
+            abort(HTTPStatus.CONFLICT)
+
+        # Добавляем новый тип животному и обновляем БД.
+        found_animal.animal_types = [*found_animal.animal_types, animal_type_id]
+        db.session.commit()
+        return found_animal, HTTPStatus.OK
+
+    @marshal_with(animal_resource_fields)  # Преобразование возвращаемого объекта `Animal` в JSON.
+    @authorization_required()  # Проверка авторизации (она обязательна).
+    @ids_validation('animal_id', 'animal_type_id')  # Валидация входящих ID животного и его типа.
+    def delete(self, animal_id: int, animal_type_id: int) -> tuple[dict, HTTPStatus] | None:
+        """Удаляет тип с указанным ID у животного с указанным ID."""
+        found_animal: Animal = Animal.query.filter_by(id=animal_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+        # Проверка: тип животного с указанным ID должен существовать в БД.
+        if not AnimalType.query.filter_by(id=animal_type_id).first():
+            abort(HTTPStatus.NOT_FOUND)
+        # Проверка: указанный ID типа животного должен быть в "animalTypes" животного.
+        if animal_type_id not in found_animal.animal_types:
+            abort(HTTPStatus.NOT_FOUND)
+        # Проверка: мы не можем удалить тип, если у животного он один.
+        if found_animal.animal_types == [animal_type_id]:
+            abort(HTTPStatus.BAD_REQUEST)
+
+        # Удаляем тип у животного и обновляем БД.
+        updated_animal_types = list(found_animal.animal_types)
+        updated_animal_types.remove(animal_type_id)
+        found_animal.animal_types = updated_animal_types
+        db.session.commit()
+        return found_animal, HTTPStatus.OK
+
+
+@resource_route(api, '/animals/<signed_int:_id>/types')
+class AnimalsIDTypes(Resource):
+
+    @marshal_with(animal_resource_fields)  # Преобразование возвращаемого объекта `Animal` в JSON.
+    @authorization_required()  # Проверка авторизации (она обязательна).
+    @request_json_validation(AnimalTypeUpdatingForAnimal)
+    def put(self, _id: int,
+            valid_json_data: AnimalTypeUpdatingForAnimal,
+            ) -> tuple[Animal, HTTPStatus] | None:
+        """Обновляет тип у животного с указанным ID."""
+        found_animal: Animal = Animal.query.filter_by(id=_id).first()
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if (not AnimalType.query.filter_by(id=valid_json_data.old_type_id).first() or
+            not AnimalType.query.filter_by(id=valid_json_data.new_type_id).first()):
+            abort(HTTPStatus.NOT_FOUND)
+
+        if valid_json_data.old_type_id not in found_animal.animal_types:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if valid_json_data.new_type_id in found_animal.animal_types:
+            abort(HTTPStatus.CONFLICT)
+
+        updated_animal_types = list(found_animal.animal_types)
+        updated_animal_types.remove(valid_json_data.old_type_id)
+        updated_animal_types.append(valid_json_data.new_type_id)
+        found_animal.animal_types = updated_animal_types
+        db.session.commit()
+        return found_animal, HTTPStatus.OK
+
+
+@resource_route(api, '/animals/<signed_int:animal_id>/locations/<signed_int:location_id>')
+class AnimalsIDLocationsID(Resource):
+
+    @marshal_with(visited_location_resource_fields)  # Преобразование возвращаемого объекта `VisitedLocation` в JSON.
+    @authorization_required()  # Проверка авторизации (она обязательна).
+    @ids_validation('animal_id', 'location_id')  # Валидация входящих ID животного и точки локации.
+    def post(self, animal_id: int, location_id: int) -> tuple[VisitedLocation, HTTPStatus] | None:
+        """Добавляет животному посещённую точку локации."""
+        found_animal: Animal = Animal.query.filter_by(id=animal_id).first()
+        if not found_animal:
+            abort(HTTPStatus.NOT_FOUND)
+
+        if not Location.query.filter_by(id=location_id).first():
+            abort(HTTPStatus.NOT_FOUND)
+
+        if found_animal.life_status == 'DEAD':
+            abort(HTTPStatus.BAD_REQUEST)
+
+        if not found_animal.visited_locations and location_id == found_animal.chipping_location_id:
+            abort(HTTPStatus.BAD_REQUEST)
+
+        if found_animal.visited_locations:
+            if VisitedLocation.query.filter_by(id=found_animal.visited_locations[-1]).first().location_id == location_id:
+                abort(HTTPStatus.BAD_REQUEST)
+
+        new_visited_location = VisitedLocation(visit_datetime=datetime.now(),
+                                               location_id=location_id)
+        db.session.add(new_visited_location)
+        db.session.commit()
+        found_animal.visited_locations = [*found_animal.visited_locations, new_visited_location.id]
+        db.session.commit()
+        return new_visited_location, HTTPStatus.CREATED

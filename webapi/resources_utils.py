@@ -11,6 +11,7 @@ from webapi.db_models import *
 __all__ = (
     'account_resource_fields',
     'location_resource_fields',
+    'visited_location_resource_fields',
     'animal_type_resource_fields',
     'animal_resource_fields',
     'resource_route',
@@ -19,6 +20,7 @@ __all__ = (
     'authorization_data_must_be_valid_or_none',
     'authorization_required',
     'id_validation',
+    'ids_validation',
     'request_json_validation',
     'request_args_validation',
     'order_by_id_and_cut_results',
@@ -39,6 +41,13 @@ location_resource_fields = {
     'id': fields.Integer,
     'latitude': fields.Integer,
     'longitude': fields.Integer,
+}
+
+# Для объектов `VisitedLocation`.
+visited_location_resource_fields = {
+    'id': fields.Integer,
+    'dateTimeOfVisitLocationPoint': fields.DateTime(attribute='visit_datetime', dt_format='iso8601'),
+    'locationPointId': fields.Integer(attribute='location_id'),
 }
 
 # Для объектов `AnimalType`.
@@ -120,6 +129,18 @@ def id_validation(method: Callable) -> Callable:
             abort(HTTPStatus.BAD_REQUEST)
         return method(*args, **kwargs)
     return wrapper
+
+
+def ids_validation(*ids_names: list[str]) -> Callable:
+    def decorator(method: Callable):
+        @wraps(method)
+        def wrapper(*args, **kwargs):
+            for id_name in ids_names:
+                if kwargs[id_name] <= 0:
+                    abort(HTTPStatus.BAD_REQUEST)
+            return method(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def request_json_validation(model: type[pydantic.BaseModel]) -> Callable:

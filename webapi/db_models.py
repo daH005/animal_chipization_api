@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 __all__ = ('db',
            'Account',
            'Location',
+           'VisitedLocation',
            'AnimalType',
            'Animal',
            )
@@ -26,6 +27,14 @@ class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     latitude = db.Column(db.Integer, nullable=False)
     longitude = db.Column(db.Integer, nullable=False)
+
+
+class VisitedLocation(db.Model):
+    __tablename__ = 'visited_locations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    visit_datetime = db.Column(db.DateTime, nullable=False)
+    location_id = db.Column(db.Integer, nullable=False)
 
 
 class AnimalType(db.Model):

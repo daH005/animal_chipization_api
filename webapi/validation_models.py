@@ -3,12 +3,14 @@ from pydantic import (BaseModel, validator, validate_email, Field,
 from datetime import datetime
 
 __all__ = ('AccountRegistrationOrUpdating',
-           'AccountSearch',
+           'AccountsSearch',
            'LocationCreatingOrUpdating',
            'AnimalTypeCreatingOrUpdating',
            'AnimalCreating',
            'AnimalUpdating',
-           'AnimalSearch',
+           'AnimalsSearch',
+           'AnimalTypeUpdatingForAnimal',
+           'VisitedLocationsSearch',
            )
 
 
@@ -23,7 +25,7 @@ class AccountRegistrationOrUpdating(BaseModel):
         return validate_email(value)[1]
 
 
-class AccountSearch(BaseModel):
+class AccountsSearch(BaseModel):
     from_: conint(ge=0) = Field(alias='from', default=0)
     size: conint(gt=0) = Field(default=10)
     first_name: str | None = Field(alias='firstName')
@@ -81,7 +83,7 @@ class AnimalUpdating(BaseModel):
             raise ValueError()
 
 
-class AnimalSearch(BaseModel):
+class AnimalsSearch(BaseModel):
     from_: conint(ge=0) = Field(alias='from', default=0)
     size: conint(gt=0) = Field(default=10)
     start_datetime: datetime | None = Field(alias='startDateTime')
@@ -104,3 +106,15 @@ class AnimalSearch(BaseModel):
             return value
         else:
             raise ValueError()
+
+
+class AnimalTypeUpdatingForAnimal(BaseModel):
+    old_type_id: conint(gt=0) = Field(alias='oldTypeId')
+    new_type_id: conint(gt=0) = Field(alias='newTypeId')
+
+
+class VisitedLocationsSearch(BaseModel):
+    from_: conint(ge=0) = Field(alias='from', default=0)
+    size: conint(gt=0) = Field(default=10)
+    start_datetime: datetime | None = Field(alias='startDateTime')
+    end_datetime: datetime | None = Field(alias='endDateTime')
