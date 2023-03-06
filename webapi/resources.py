@@ -1,7 +1,7 @@
 from flask_restful import Api, Resource, abort, marshal_with
 from http import HTTPStatus
 from typing import Iterable
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import or_ as sql_or
 
 from webapi.db_models import *
@@ -267,7 +267,7 @@ class AnimalsTypesID(Resource):
         found_animal_type = AnimalType.query.filter_by(id=_id).first()
         if found_animal_type:
             # Проверка: нельзя удалять тип, если он есть у хотя бы одного животного.
-            if Animal.query.filter(Animal.animal_types.contains(_id)).first():
+            if Animal.query.filter(Animal.animal_types.contains([_id])).first():
                 abort(HTTPStatus.BAD_REQUEST)
 
             # Удаляем тип животного из БД.
@@ -305,7 +305,7 @@ class Animals(Resource):
         else:
             new_animal_data_dict = valid_json_data.dict()
             # Указываем текущие дату и время как дату и время создания (чипирования) животного.
-            new_animal_data_dict['chipping_datetime'] = datetime.now()
+            new_animal_data_dict['chipping_datetime'] = datetime.now(timezone.utc)
 
             # Добавляем животное в БД.
             new_animal = Animal(**new_animal_data_dict)
@@ -345,12 +345,12 @@ class AnimalsID(Resource):
 
         found_animal: Animal = Animal.query.filter_by(id=_id).first()
 
-        # Проверка: новая точка чипирования не должна совпадать с первой посещённой.
-        if len(found_animal.visited_locations) > 0:
-            if valid_json_data.chipping_location_id == VisitedLocation.query.filter_by(id=found_animal.visited_locations[0]).first().location_id:
-                abort(HTTPStatus.BAD_REQUEST)
-
         if found_animal:
+            # Проверка: новая точка чипирования не должна совпадать с первой посещённой.
+            if len(found_animal.visited_locations) > 0:
+                if valid_json_data.chipping_location_id == VisitedLocation.query.filter_by(
+                        id=found_animal.visited_locations[0]).first().location_id:
+                    abort(HTTPStatus.BAD_REQUEST)
             new_animal_data_dict = valid_json_data.dict()
             # Проверка: нельзя сменять статус "DEAD" на "ALIVE".
             if found_animal.life_status == 'DEAD' and valid_json_data.life_status == 'ALIVE':
@@ -358,7 +358,7 @@ class AnimalsID(Resource):
             # Если мы сменяем "ALIVE" на "DEAD", то указываем текущие дату и время
             # как время смерти животного.
             if found_animal.life_status == 'ALIVE' and valid_json_data.life_status == 'DEAD':
-                new_animal_data_dict['death_datetime'] = datetime.now()
+                new_animal_data_dict['death_datetime'] = datetime.now(timezone.utc)
 
             # Обновляем животное в БД.
             set_attrs_of_model_instance(found_animal, new_animal_data_dict)
@@ -528,7 +528,7 @@ class AnimalsIDLocationsID(Resource):
             if VisitedLocation.query.filter_by(id=found_animal.visited_locations[-1]).first().location_id == location_id:
                 abort(HTTPStatus.BAD_REQUEST)
 
-        new_visited_location = VisitedLocation(visit_datetime=datetime.now(),
+        new_visited_location = VisitedLocation(visit_datetime=datetime.now(timezone.utc),
                                                location_id=location_id)
         db.session.add(new_visited_location)
         db.session.commit()
