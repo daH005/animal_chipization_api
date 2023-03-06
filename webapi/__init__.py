@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from werkzeug.routing import IntegerConverter
 
 from webapi.db_models import db
 from webapi.config import *
@@ -12,6 +13,13 @@ __all__ = (
 )
 
 app = Flask(__name__)
+
+
+class SignedIntConverter(IntegerConverter):
+    regex = r'-?\d+'
+
+
+app.url_map.converters['signed_int'] = SignedIntConverter
 
 
 @app.route('/', methods=['GET'])

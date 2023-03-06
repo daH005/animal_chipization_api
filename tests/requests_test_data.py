@@ -80,7 +80,11 @@ INVALID_SIZES: Final = [
 
 INVALID_IDS: Final = [
     '0',
-    0
+    0,
+    -1,
+    -2,
+    '-1',
+    -1000,
 ]
 
 NON_EXISTENT_IDS: Final = [

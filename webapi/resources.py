@@ -37,7 +37,7 @@ class Registration(Resource):
             return new_account, HTTPStatus.CREATED
 
 
-@resource_route(api, '/accounts/<int:_id>')
+@resource_route(api, '/accounts/<signed_int:_id>')
 class AccountsID(Resource):
 
     @marshal_with(account_resource_fields)  # Преобразование возвращаемого объекта `Account` в JSON.
@@ -142,7 +142,7 @@ class Locations(Resource):
             return new_location, HTTPStatus.CREATED
 
 
-@resource_route(api, '/locations/<int:_id>')
+@resource_route(api, '/locations/<signed_int:_id>')
 class LocationsID(Resource):
 
     @marshal_with(location_resource_fields)  # Преобразование возвращаемого объекта `Location` в JSON.
@@ -217,7 +217,7 @@ class AnimalsTypes(Resource):
             return new_animal_type, HTTPStatus.CREATED
 
 
-@resource_route(api, '/animals/types/<int:_id>')
+@resource_route(api, '/animals/types/<signed_int:_id>')
 class AnimalsTypesID(Resource):
 
     @marshal_with(animal_type_resource_fields)  # Преобразование возвращаемого объекта `AnimalType` в JSON.
@@ -306,7 +306,7 @@ class Animals(Resource):
             return new_animal, HTTPStatus.CREATED
 
 
-@resource_route(api, '/animals/<int:_id>')
+@resource_route(api, '/animals/<signed_int:_id>')
 class AnimalsID(Resource):
 
     @marshal_with(animal_resource_fields)  # Преобразование возвращаемого объекта `Animal` в JSON.
