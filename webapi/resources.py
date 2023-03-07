@@ -28,14 +28,14 @@ class Registration(Resource):
             abort(HTTPStatus.FORBIDDEN)
 
         # Проверка: email не должен быть занят.
-        if Account.query.filter_by(email=valid_json_data.email).first():
-            abort(HTTPStatus.CONFLICT)
-        else:
+        if not Account.query.filter_by(email=valid_json_data.email).first():
             # Создаём новый аккаунт в БД.
             new_account = Account(**valid_json_data.dict())
             db.session.add(new_account)
             db.session.commit()
             return new_account, HTTPStatus.CREATED
+        else:
+            abort(HTTPStatus.CONFLICT)
 
 
 @resource_route(api, '/accounts/<signed_int:_id>')
@@ -85,7 +85,6 @@ class AccountsID(Resource):
                ) -> tuple[dict, HTTPStatus] | None:
         """Удаляет аккаунт с указанным ID."""
         found_account: Account = Account.query.filter_by(id=_id).first()
-
         # Проверка: удалять можно только свой аккаунт.
         if found_account and found_account == authorized_account:
             # Проверка: нельзя удалять аккаунт, который связан с животным.
@@ -134,15 +133,15 @@ class Locations(Resource):
     def post(self, valid_json_data: LocationCreatingOrUpdating,
              ) -> tuple[Location, HTTPStatus] | None:
         """Создаёт новую точку локации."""
-        # Проверка: указанные координаты должны быть свободны.
-        if Location.query.filter_by(**valid_json_data.dict()).first():
-            abort(HTTPStatus.CONFLICT)
-        else:
+        # Проверка: указанные координаты не должны быть заняты другой локацией.
+        if not Location.query.filter_by(**valid_json_data.dict()).first():
             # Создаём новую точку в БД.
             new_location = Location(**valid_json_data.dict())
             db.session.add(new_location)
             db.session.commit()
             return new_location, HTTPStatus.CREATED
+        else:
+            abort(HTTPStatus.CONFLICT)
 
 
 @resource_route(api, '/locations/<signed_int:_id>')
@@ -174,7 +173,7 @@ class LocationsID(Resource):
             # Если такой локации нет, либо это та же самая локация, которая обновляется,
             # то продолжим обработку.
             if not location_with_taken_coords or location_with_taken_coords == found_location:
-                # Обновляем точку в БД.
+                # Обновляем точку локации в БД.
                 set_attrs_of_model_instance(found_location, valid_json_data.dict())
                 db.session.commit()
                 return found_location, HTTPStatus.OK
@@ -188,10 +187,10 @@ class LocationsID(Resource):
     def delete(self, _id: int) -> tuple[dict, HTTPStatus] | None:
         """Удаляет точку локации с указанным ID."""
         found_location = Location.query.filter_by(id=_id).first()
-
         if found_location:
             # Проверка: нельзя удалять точку локации, связанную с животным.
-            if VisitedLocation.query.filter_by(location_id=found_location.id).first():
+            if (VisitedLocation.query.filter_by(location_id=found_location.id).first() or
+                Animal.query.filter_by(chipping_location_id=found_location.id).first()):
                 abort(HTTPStatus.BAD_REQUEST)
 
             # Удаляем точку локации из БД.
@@ -212,14 +211,14 @@ class AnimalsTypes(Resource):
              ) -> tuple[AnimalType, HTTPStatus] | None:
         """Создаёт новый тип животного."""
         # Проверка: указанный тип животного должен быть свободен.
-        if AnimalType.query.filter_by(type=valid_json_data.type).first():
-            abort(HTTPStatus.CONFLICT)
-        else:
+        if not AnimalType.query.filter_by(type=valid_json_data.type).first():
             # Создаём новый тип животного в БД.
             new_animal_type = AnimalType(**valid_json_data.dict())
             db.session.add(new_animal_type)
             db.session.commit()
             return new_animal_type, HTTPStatus.CREATED
+        else:
+            abort(HTTPStatus.CONFLICT)
 
 
 @resource_route(api, '/animals/types/<signed_int:_id>')
@@ -263,7 +262,6 @@ class AnimalsTypesID(Resource):
     @id_validation  # Валидация входящего ID типа животного.
     def delete(self, _id: int) -> tuple[dict, HTTPStatus] | None:
         """Удаляет тип животного с указанным ID."""
-
         found_animal_type = AnimalType.query.filter_by(id=_id).first()
         if found_animal_type:
             # Проверка: нельзя удалять тип, если он есть у хотя бы одного животного.
@@ -344,7 +342,6 @@ class AnimalsID(Resource):
             abort(HTTPStatus.NOT_FOUND)
 
         found_animal: Animal = Animal.query.filter_by(id=_id).first()
-
         if found_animal:
             # Проверка: новая точка чипирования не должна совпадать с первой посещённой.
             if len(found_animal.visited_locations) > 0:
@@ -356,7 +353,7 @@ class AnimalsID(Resource):
             if found_animal.life_status == 'DEAD' and valid_json_data.life_status == 'ALIVE':
                 abort(HTTPStatus.BAD_REQUEST)
             # Если мы сменяем "ALIVE" на "DEAD", то указываем текущие дату и время
-            # как время смерти животного.
+            # как дату и время смерти животного.
             if found_animal.life_status == 'ALIVE' and valid_json_data.life_status == 'DEAD':
                 new_animal_data_dict['death_datetime'] = datetime.now(timezone.utc)
 
@@ -371,12 +368,10 @@ class AnimalsID(Resource):
     @id_validation  # Валидация входящего ID животного.
     def delete(self, _id: int) -> tuple[dict, HTTPStatus] | None:
         """Удаляет животное с указанным ID."""
-
         found_animal = Animal.query.filter_by(id=_id).first()
-
         if found_animal:
-            # Проверка: животное покинуло локацию чипирования + есть более одной точки.
-            if len(found_animal.visited_locations) > 1:
+            # Проверка: для удаления животное должно находиться в точке чипирования.
+            if len(found_animal.visited_locations) > 0:
                 if VisitedLocation.query.filter_by(
                         id=found_animal.visited_locations[-1]).first().location_id != found_animal.chipping_location_id:
                     abort(HTTPStatus.BAD_REQUEST)
@@ -442,7 +437,7 @@ class AnimalsIDTypesID(Resource):
         # Добавляем новый тип животному и обновляем БД.
         found_animal.animal_types = [*found_animal.animal_types, animal_type_id]
         db.session.commit()
-        return found_animal, HTTPStatus.OK
+        return found_animal, HTTPStatus.CREATED
 
     @marshal_with(animal_resource_fields)  # Преобразование возвращаемого объекта `Animal` в JSON.
     @authorization_required()  # Проверка авторизации (она обязательна).
@@ -476,25 +471,28 @@ class AnimalsIDTypes(Resource):
 
     @marshal_with(animal_resource_fields)  # Преобразование возвращаемого объекта `Animal` в JSON.
     @authorization_required()  # Проверка авторизации (она обязательна).
-    @request_json_validation(AnimalTypeUpdatingForAnimal)
+    @id_validation  # Валидация входящего ID животного.
+    @request_json_validation(AnimalTypeUpdatingForAnimal)  # Валидация входящего JSON.
     def put(self, _id: int,
             valid_json_data: AnimalTypeUpdatingForAnimal,
             ) -> tuple[Animal, HTTPStatus] | None:
         """Обновляет тип у животного с указанным ID."""
         found_animal: Animal = Animal.query.filter_by(id=_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
         if not found_animal:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: старый и новый типы должны существовать в БД.
         if (not AnimalType.query.filter_by(id=valid_json_data.old_type_id).first() or
             not AnimalType.query.filter_by(id=valid_json_data.new_type_id).first()):
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: старый тип должен быть в списке "animalTypes".
         if valid_json_data.old_type_id not in found_animal.animal_types:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: нового типа не должно быть в списке "animalTypes".
         if valid_json_data.new_type_id in found_animal.animal_types:
             abort(HTTPStatus.CONFLICT)
 
+        # Обновляем тип у животного.
         updated_animal_types = list(found_animal.animal_types)
         updated_animal_types.remove(valid_json_data.old_type_id)
         updated_animal_types.append(valid_json_data.new_type_id)
@@ -512,22 +510,24 @@ class AnimalsIDLocationsID(Resource):
     def post(self, animal_id: int, location_id: int) -> tuple[VisitedLocation, HTTPStatus] | None:
         """Добавляет животному посещённую точку локации."""
         found_animal: Animal = Animal.query.filter_by(id=animal_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
         if not found_animal:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: локация с указанным ID должна существовать в БД.
         if not Location.query.filter_by(id=location_id).first():
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: нельзя добавить новую посещённую точку умершему животному.
         if found_animal.life_status == 'DEAD':
             abort(HTTPStatus.BAD_REQUEST)
-
+        # Проверка: первая посещённая точка не должна быть равна точке чипирования.
         if not found_animal.visited_locations and location_id == found_animal.chipping_location_id:
             abort(HTTPStatus.BAD_REQUEST)
-
+        # Проверка: новая точка не должна быть равна точке, в которой животное уже находится.
         if found_animal.visited_locations:
             if VisitedLocation.query.filter_by(id=found_animal.visited_locations[-1]).first().location_id == location_id:
                 abort(HTTPStatus.BAD_REQUEST)
 
+        # Добавляем новую посещённую точку в БД и указываем её для животного.
         new_visited_location = VisitedLocation(visit_datetime=datetime.now(timezone.utc),
                                                location_id=location_id)
         db.session.add(new_visited_location)
@@ -536,26 +536,31 @@ class AnimalsIDLocationsID(Resource):
         db.session.commit()
         return new_visited_location, HTTPStatus.CREATED
 
-    @authorization_required()
+    @authorization_required()  # Проверка авторизации (она обязательна).
     @ids_validation('animal_id', 'location_id')  # Валидация входящих ID животного и точки локации посещённой животным.
     def delete(self, animal_id: int, location_id: int) -> tuple[dict, HTTPStatus] | None:
-        """"""
+        """Удаляет посещённую точку у животного."""
+        # Здесь используется ID посещённой точки, а не обычной точки локации.
+        # Во избежание путаницы переименовал ссылку.
         visited_location_id = location_id
 
         found_animal: Animal = Animal.query.filter_by(id=animal_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
         if not found_animal:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: посещённая точка с указанным ID должна существовать в БД.
         found_visited_location: VisitedLocation = VisitedLocation.query.filter_by(id=visited_location_id).first()
         if not found_visited_location:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: посещённая точка должна быть в списке "visitedLocations".
         if visited_location_id not in found_animal.visited_locations:
             abort(HTTPStatus.NOT_FOUND)
 
+        # Удаляем посещённую точку из БД и из "visitedLocations" животного.
         new_visited_locations = list(found_animal.visited_locations)
         new_visited_locations.remove(visited_location_id)
         if len(new_visited_locations) > 0:
+            # Если после удаления, 0-я в списке точка равна точке чипирования, то удалим и её.
             if VisitedLocation.query.filter_by(id=new_visited_locations[0]).first().location_id == found_animal.chipping_location_id:
                 del new_visited_locations[0]
         found_animal.visited_locations = new_visited_locations
@@ -568,73 +573,82 @@ class AnimalsIDLocationsID(Resource):
 @resource_route(api, '/animals/<signed_int:_id>/locations')
 class AnimalsIDLocations(Resource):
 
-    @marshal_with(visited_location_resource_fields)
-    @cut_results
-    @authorization_data_must_be_valid_or_none
-    @request_args_validation(VisitedLocationsSearch)
+    @marshal_with(visited_location_resource_fields)  # Преобразование возвращаемого списка объектов `VisitedLocation` в JSON.
+    @cut_results  # Срез результатов поиска.
+    @authorization_data_must_be_valid_or_none  # Проверка авторизационных данных: либо они корректны, либо их нет.
+    @id_validation  # Валидация входящего ID животного.
+    @request_args_validation(VisitedLocationsSearch)  # Валидация входящих GET-параметров.
     def get(self, _id: int,
             valid_args_data: VisitedLocationsSearch,
             ) -> tuple[list[VisitedLocation], int, int] | None:
+        """Выдаёт список посещённых животным точек по параметрам (диапазону даты и времени)."""
         found_animal: Animal = Animal.query.filter_by(id=_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
         if not found_animal:
             abort(HTTPStatus.NOT_FOUND)
 
-        # FixMe
+        # Если список "visitedLocations" пуст, то соответственно вернём пустой список.
         if not found_animal.visited_locations:
             return [], valid_args_data.from_, valid_args_data.size
 
-        # FixMe
+        # Параметры фильтрации для отбора из БД посещённых точек, указанных в "visitedLocations" у животного.
         visited_locations_filter_args = [VisitedLocation.id == __id for __id in found_animal.visited_locations]
+        # Отдельно формируем параметры для фильтрации по дате и времени.
         datetime_filter_args = []
         if valid_args_data.start_datetime:
+            # Дата от (включительно).
             datetime_filter_args.append(VisitedLocation.visit_datetime >= valid_args_data.start_datetime)
+            # Дата до (включительно).
         if valid_args_data.end_datetime:
             datetime_filter_args.append(VisitedLocation.visit_datetime <= valid_args_data.end_datetime)
-        found_visited_locations = VisitedLocation.query.filter(sql_or(*visited_locations_filter_args)).filter(*datetime_filter_args)
 
+        found_visited_locations = VisitedLocation.query.filter(sql_or(*visited_locations_filter_args)).filter(*datetime_filter_args)
         return (found_visited_locations.order_by('visit_datetime'),
                 valid_args_data.from_,
                 valid_args_data.size)
 
-    @marshal_with(visited_location_resource_fields)
-    @authorization_required()
-    @id_validation
-    @request_json_validation(VisitedLocationUpdating)
+    @marshal_with(visited_location_resource_fields)  # Преобразование возвращаемого объекта `VisitedLocation` в JSON.
+    @authorization_required()  # Проверка авторизации (она обязательна).
+    @id_validation  # Валидация входящего ID животного.
+    @request_json_validation(VisitedLocationUpdating)  # Валидация входящего JSON.
     def put(self, _id: int,
             valid_json_data: VisitedLocationUpdating,
             ) -> tuple[VisitedLocation, HTTPStatus] | None:
+        """Обновляет посещённую животным точку."""
         found_animal: Animal = Animal.query.filter_by(id=_id).first()
+        # Проверка: животное с указанным ID должно существовать в БД.
         if not found_animal:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: обновляемая посещённая точка должна быть в списке "visitedLocations" животного.
         if valid_json_data.visited_location_id not in found_animal.visited_locations:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: заменяемая точка локации должна существовать в БД.
         if not Location.query.filter_by(id=valid_json_data.location_id).first():
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: обновляемая посещённая точка должна существовать в БД.
         found_visited_location: VisitedLocation = VisitedLocation.query.filter_by(id=valid_json_data.visited_location_id).first()
         if not found_visited_location:
             abort(HTTPStatus.NOT_FOUND)
-
+        # Проверка: если обновляется первая точка, то она не должна быть равная точке чипирования.
         if (found_animal.visited_locations.index(found_visited_location.id) == 0 and
             valid_json_data.location_id == found_animal.chipping_location_id):
             abort(HTTPStatus.BAD_REQUEST)
-
+        # Проверка: нельзя заменить точку локации на саму себя.
         if found_visited_location.location_id == valid_json_data.location_id:
             abort(HTTPStatus.BAD_REQUEST)
 
         if len(found_animal.visited_locations) > 1:
+            # Проверка: новая точка локации не должна быть такой же, как предыдущая добавленная.
             _index = found_animal.visited_locations.index(valid_json_data.visited_location_id)
             if _index != len(found_animal.visited_locations) - 1:
                 if VisitedLocation.query.filter_by(id=found_animal.visited_locations[_index + 1]).first().location_id == valid_json_data.location_id:
                     abort(HTTPStatus.BAD_REQUEST)
-
+            # Проверка: новая точка локации не должна быть такой же, как последующая добавленная.
             if _index != 0:
                 if VisitedLocation.query.filter_by(
                         id=found_animal.visited_locations[_index - 1]).first().location_id == valid_json_data.location_id:
                     abort(HTTPStatus.BAD_REQUEST)
-
+        # Обновляем посещённую точку локации.
         found_visited_location.location_id = valid_json_data.location_id
         db.session.commit()
         return found_visited_location, HTTPStatus.OK

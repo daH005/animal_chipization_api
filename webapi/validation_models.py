@@ -35,8 +35,8 @@ class AccountsSearch(BaseModel):
 
 
 class LocationCreatingOrUpdating(BaseModel):
-    latitude: conint(ge=-90, le=90)
-    longitude: conint(ge=-180, le=180)
+    latitude: confloat(ge=-90, le=90)
+    longitude: confloat(ge=-180, le=180)
 
 
 class AnimalTypeCreatingOrUpdating(BaseModel):

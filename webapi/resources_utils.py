@@ -39,8 +39,8 @@ account_resource_fields = {
 # Для объектов `Location`.
 location_resource_fields = {
     'id': fields.Integer,
-    'latitude': fields.Integer,
-    'longitude': fields.Integer,
+    'latitude': fields.Float,
+    'longitude': fields.Float,
 }
 
 # Для объектов `VisitedLocation`.
