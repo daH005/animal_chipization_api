@@ -1,3 +1,7 @@
+"""
+Модуль содержит различные вспомогательные функции и объекты для модуля `resources`.
+"""
+
 import pydantic
 from flask import request
 from flask_restful import abort, fields, Api, Resource

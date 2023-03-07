@@ -1,3 +1,7 @@
+"""
+Модуль содержит модели валидации для поступающих приложению JSON'ов и GET-параметров.
+"""
+
 from pydantic import (BaseModel, validator, validate_email, Field,
                       constr, conint, conlist, confloat, )
 from datetime import datetime

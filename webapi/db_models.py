@@ -1,3 +1,7 @@
+"""
+Модуль содержит ORM-модели для БД приложения.
+"""
+
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY
 

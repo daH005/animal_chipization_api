@@ -19,11 +19,12 @@ services:
 
 # Сервис для разворачивания контейнера с приложением
   webapi:
-    image: animal_chipization_api:v1
+    image: animal_chipization_api
     ports:
       - "8080:8080"
     depends_on:
       database:
+        # Приложение загружается только тогда, когда postgres сообщает о том, что он готов к работе.
         condition: service_healthy
     environment:
       - FLASK_DEBUG=TRUE

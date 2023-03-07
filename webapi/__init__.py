@@ -1,10 +1,14 @@
+"""
+Модуль предоставляет доступ к настройке и запуску приложения.
+"""
+
 import os
 from flask import Flask
 from werkzeug.routing import IntegerConverter
 
 from webapi.db_models import db
-from webapi.resources import api
 from webapi.config import *
+from webapi.resources import *
 
 __all__ = (
     'app',
@@ -20,7 +24,7 @@ class SignedIntConverter(IntegerConverter):
 
 
 # Добавляем новый обработчик целого числа в URL,
-# который работает также с отрицательными числами.
+# который работает помимо чисел >= 0, также с отрицательными числами.
 # (стандартный "int" не включает их в себя). 
 app.url_map.converters['signed_int'] = SignedIntConverter
 

@@ -1,3 +1,8 @@
+"""
+Модуль содержит настройки приложения,
+а также загружает переменные окружения.
+"""
+
 import os
 from typing import Final
 from dotenv import load_dotenv

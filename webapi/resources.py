@@ -1,3 +1,7 @@
+"""
+Модуль содержит обработчики различных URN'ов приложения (подклассы `Resource`).
+"""
+
 from flask_restful import Api, Resource, abort, marshal_with
 from http import HTTPStatus
 from typing import Iterable
@@ -629,7 +633,7 @@ class AnimalsIDLocations(Resource):
         found_visited_location: VisitedLocation = VisitedLocation.query.filter_by(id=valid_json_data.visited_location_id).first()
         if not found_visited_location:
             abort(HTTPStatus.NOT_FOUND)
-        # Проверка: если обновляется первая точка, то она не должна быть равная точке чипирования.
+        # Проверка: если обновляется первая точка, то она не должна быть равна точке чипирования.
         if (found_animal.visited_locations.index(found_visited_location.id) == 0 and
             valid_json_data.location_id == found_animal.chipping_location_id):
             abort(HTTPStatus.BAD_REQUEST)
